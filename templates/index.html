@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+<head>
+    <title>Voting buttons</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<h2>Voting buttons</h2>
+
+<form action="/vote/yes" method="post">
+    <input type="submit" value="Yes ({{ yes_count }})" class="button">
+</form>
+
+<form action="/vote/no" method="post">
+    <input type="submit" value="No ({{ no_count }})" class="button button-red">
+</form>
+
+</body>
+</html>
