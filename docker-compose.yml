@@ -6,5 +6,11 @@ services:
       - "6060:5000"
     volumes:
       - .:/app
+    depends_on:
+      - redis
     environment:
       FLASK_ENV: development
+  redis:
+    image: "redis:alpine"
+    expose:
+      - "6379"
