@@ -6,7 +6,7 @@ yesnoapp:
   image:
     repository: oskarq/yesnoapp
     tag: redis
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   service:
     type: LoadBalancer
     port: 6060
