@@ -5,7 +5,7 @@ replicaCount: 1
 yesnoapp:
   image:
     repository: oskarq/yesnoapp
-    tag: redis
+    tag: redis-helm
     pullPolicy: Always
   service:
     type: LoadBalancer
