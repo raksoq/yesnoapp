@@ -21,3 +21,6 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.yesnoapp.service.targetPort }}
+          envFrom:
+          - configMapRef:
+              name: {{ include "yesnoapp.fullname" . }}-envs

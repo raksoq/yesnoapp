@@ -5,7 +5,7 @@ replicaCount: 1
 yesnoapp:
   image:
     repository: oskarq/yesnoapp
-    tag: redis
+    tag: redis-helmx
     pullPolicy: Always
   service:
     type: LoadBalancer
@@ -84,3 +84,8 @@ serviceAccount:
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# values.yaml
+configMap:
+  ENV: "production"
+
