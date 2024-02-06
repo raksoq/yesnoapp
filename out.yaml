@@ -1,0 +1,514 @@
+---
+# Source: yesnoapp/charts/redis/templates/networkpolicy.yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: yesnoapp-redis
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.12.1
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: yesnoapp
+      app.kubernetes.io/name: redis
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - {}
+  ingress:
+    # Allow inbound connections
+    - ports:
+        - port: 6379
+---
+# Source: yesnoapp/charts/redis/templates/master/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+automountServiceAccountToken: false
+metadata:
+  name: yesnoapp-redis-master
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.12.1
+---
+# Source: yesnoapp/charts/redis/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yesnoapp-redis-configuration
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.12.1
+data:
+  redis.conf: |-
+    # User-supplied common configuration:
+    # Enable AOF https://redis.io/topics/persistence#append-only-file
+    appendonly yes
+    # Disable RDB persistence, AOF persistence already enabled.
+    save ""
+    # End of common configuration
+  master.conf: |-
+    dir /data
+    # User-supplied master configuration:
+    rename-command FLUSHDB ""
+    rename-command FLUSHALL ""
+    # End of master configuration
+  replica.conf: |-
+    dir /data
+    # User-supplied replica configuration:
+    rename-command FLUSHDB ""
+    rename-command FLUSHALL ""
+    # End of replica configuration
+---
+# Source: yesnoapp/charts/redis/templates/health-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yesnoapp-redis-health
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.12.1
+data:
+  ping_readiness_local.sh: |-
+    #!/bin/bash
+
+    [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
+    [[ -n "$REDIS_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_PASSWORD"
+    response=$(
+      timeout -s 15 $1 \
+      redis-cli \
+        -h localhost \
+        -p $REDIS_PORT \
+        ping
+    )
+    if [ "$?" -eq "124" ]; then
+      echo "Timed out"
+      exit 1
+    fi
+    if [ "$response" != "PONG" ]; then
+      echo "$response"
+      exit 1
+    fi
+  ping_liveness_local.sh: |-
+    #!/bin/bash
+
+    [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
+    [[ -n "$REDIS_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_PASSWORD"
+    response=$(
+      timeout -s 15 $1 \
+      redis-cli \
+        -h localhost \
+        -p $REDIS_PORT \
+        ping
+    )
+    if [ "$?" -eq "124" ]; then
+      echo "Timed out"
+      exit 1
+    fi
+    responseFirstWord=$(echo $response | head -n1 | awk '{print $1;}')
+    if [ "$response" != "PONG" ] && [ "$responseFirstWord" != "LOADING" ] && [ "$responseFirstWord" != "MASTERDOWN" ]; then
+      echo "$response"
+      exit 1
+    fi
+  ping_readiness_master.sh: |-
+    #!/bin/bash
+
+    [[ -f $REDIS_MASTER_PASSWORD_FILE ]] && export REDIS_MASTER_PASSWORD="$(< "${REDIS_MASTER_PASSWORD_FILE}")"
+    [[ -n "$REDIS_MASTER_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_MASTER_PASSWORD"
+    response=$(
+      timeout -s 15 $1 \
+      redis-cli \
+        -h $REDIS_MASTER_HOST \
+        -p $REDIS_MASTER_PORT_NUMBER \
+        ping
+    )
+    if [ "$?" -eq "124" ]; then
+      echo "Timed out"
+      exit 1
+    fi
+    if [ "$response" != "PONG" ]; then
+      echo "$response"
+      exit 1
+    fi
+  ping_liveness_master.sh: |-
+    #!/bin/bash
+
+    [[ -f $REDIS_MASTER_PASSWORD_FILE ]] && export REDIS_MASTER_PASSWORD="$(< "${REDIS_MASTER_PASSWORD_FILE}")"
+    [[ -n "$REDIS_MASTER_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_MASTER_PASSWORD"
+    response=$(
+      timeout -s 15 $1 \
+      redis-cli \
+        -h $REDIS_MASTER_HOST \
+        -p $REDIS_MASTER_PORT_NUMBER \
+        ping
+    )
+    if [ "$?" -eq "124" ]; then
+      echo "Timed out"
+      exit 1
+    fi
+    responseFirstWord=$(echo $response | head -n1 | awk '{print $1;}')
+    if [ "$response" != "PONG" ] && [ "$responseFirstWord" != "LOADING" ]; then
+      echo "$response"
+      exit 1
+    fi
+  ping_readiness_local_and_master.sh: |-
+    script_dir="$(dirname "$0")"
+    exit_status=0
+    "$script_dir/ping_readiness_local.sh" $1 || exit_status=$?
+    "$script_dir/ping_readiness_master.sh" $1 || exit_status=$?
+    exit $exit_status
+  ping_liveness_local_and_master.sh: |-
+    script_dir="$(dirname "$0")"
+    exit_status=0
+    "$script_dir/ping_liveness_local.sh" $1 || exit_status=$?
+    "$script_dir/ping_liveness_master.sh" $1 || exit_status=$?
+    exit $exit_status
+---
+# Source: yesnoapp/charts/redis/templates/scripts-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yesnoapp-redis-scripts
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.12.1
+data:
+  start-master.sh: |
+    #!/bin/bash
+
+    [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
+    if [[ -f /opt/bitnami/redis/mounted-etc/master.conf ]];then
+        cp /opt/bitnami/redis/mounted-etc/master.conf /opt/bitnami/redis/etc/master.conf
+    fi
+    if [[ -f /opt/bitnami/redis/mounted-etc/redis.conf ]];then
+        cp /opt/bitnami/redis/mounted-etc/redis.conf /opt/bitnami/redis/etc/redis.conf
+    fi
+    ARGS=("--port" "${REDIS_PORT}")
+    ARGS+=("--protected-mode" "no")
+    ARGS+=("--include" "/opt/bitnami/redis/etc/redis.conf")
+    ARGS+=("--include" "/opt/bitnami/redis/etc/master.conf")
+    exec redis-server "${ARGS[@]}"
+---
+# Source: yesnoapp/charts/redis/templates/headless-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: yesnoapp-redis-headless
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.12.1
+  annotations:
+    
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: tcp-redis
+      port: 6379
+      targetPort: redis
+  selector:
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/name: redis
+---
+# Source: yesnoapp/charts/redis/templates/master/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: yesnoapp-redis-master
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.12.1
+    app.kubernetes.io/component: master
+spec:
+  type: ClusterIP
+  internalTrafficPolicy: Cluster
+  sessionAffinity: None
+  ports:
+    - name: tcp-redis
+      port: 6379
+      targetPort: redis
+      nodePort: null
+  selector:
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: master
+---
+# Source: yesnoapp/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: yesnoapp-web
+  labels:
+    helm.sh/chart: yesnoapp-0.1.0
+    app.kubernetes.io/name: yesnoapp
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: NodePort
+  ports:
+    - port: 6060
+      targetPort: 5000
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: yesnoapp
+    app.kubernetes.io/instance: yesnoapp
+---
+# Source: yesnoapp/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yesnoapp
+  labels:
+    helm.sh/chart: yesnoapp-0.1.0
+    app.kubernetes.io/name: yesnoapp
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: yesnoapp
+      app.kubernetes.io/instance: yesnoapp
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: yesnoapp-0.1.0
+        app.kubernetes.io/name: yesnoapp
+        app.kubernetes.io/instance: yesnoapp
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      serviceAccountName: default
+      securityContext:
+        null
+      containers:
+        - name: yesnoapp
+          securityContext:
+            null
+---
+# Source: yesnoapp/charts/redis/templates/master/application.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: yesnoapp-redis-master
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.12.1
+    app.kubernetes.io/component: master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: yesnoapp
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/component: master
+  serviceName: yesnoapp-redis-headless
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: yesnoapp
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: redis
+        app.kubernetes.io/version: 7.2.4
+        helm.sh/chart: redis-18.12.1
+        app.kubernetes.io/component: master
+      annotations:
+        checksum/configmap: 86bcc953bb473748a3d3dc60b7c11f34e60c93519234d4c37f42e22ada559d47
+        checksum/health: aff24913d801436ea469d8d374b2ddb3ec4c43ee7ab24663d5f8ff1a1b6991a9
+        checksum/scripts: 43cdf68c28f3abe25ce017a82f74dbf2437d1900fd69df51a55a3edf6193d141
+        checksum/secret: 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
+    spec:
+      
+      securityContext:
+        fsGroup: 1001
+        fsGroupChangePolicy: Always
+        supplementalGroups: []
+        sysctls: []
+      serviceAccountName: yesnoapp-redis-master
+      automountServiceAccountToken: false
+      affinity:
+        podAffinity:
+          
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: yesnoapp
+                    app.kubernetes.io/name: redis
+                    app.kubernetes.io/component: master
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        nodeAffinity:
+          
+      enableServiceLinks: true
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: redis
+          image: docker.io/bitnami/redis:7.2.4-debian-11-r5
+          imagePullPolicy: "IfNotPresent"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            runAsGroup: 0
+            runAsNonRoot: true
+            runAsUser: 1001
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - /bin/bash
+          args:
+            - -c
+            - /opt/bitnami/scripts/start-scripts/start-master.sh
+          env:
+            - name: BITNAMI_DEBUG
+              value: "false"
+            - name: REDIS_REPLICATION_MODE
+              value: master
+            - name: ALLOW_EMPTY_PASSWORD
+              value: "yes"
+            - name: REDIS_TLS_ENABLED
+              value: "no"
+            - name: REDIS_PORT
+              value: "6379"
+          ports:
+            - name: redis
+              containerPort: 6379
+          livenessProbe:
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            # One second longer than command timeout should prevent generation of zombie processes.
+            timeoutSeconds: 6
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+                - sh
+                - -c
+                - /health/ping_liveness_local.sh 5
+          readinessProbe:
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+                - sh
+                - -c
+                - /health/ping_readiness_local.sh 1
+          resources:
+            limits: {}
+            requests: {}
+          volumeMounts:
+            - name: start-scripts
+              mountPath: /opt/bitnami/scripts/start-scripts
+            - name: health
+              mountPath: /health
+            - name: redis-data
+              mountPath: /data
+            - name: config
+              mountPath: /opt/bitnami/redis/mounted-etc
+            - name: redis-tmp-conf
+              mountPath: /opt/bitnami/redis/etc/
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: start-scripts
+          configMap:
+            name: yesnoapp-redis-scripts
+            defaultMode: 0755
+        - name: health
+          configMap:
+            name: yesnoapp-redis-health
+            defaultMode: 0755
+        - name: config
+          configMap:
+            name: yesnoapp-redis-configuration
+        - name: redis-tmp-conf
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: redis-data
+          emptyDir: {}
+---
+# Source: yesnoapp/templates/ingress.yaml
+# Adjusted to refer to yesnoapp service port
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: yesnoapp
+  labels:
+    helm.sh/chart: yesnoapp-0.1.0
+    app.kubernetes.io/name: yesnoapp
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/managed-by: Helm
+spec:
+  rules:
+    - host: 
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: yesnoapp
+                port:
+                  number: 6060
+---
+# Source: yesnoapp/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "yesnoapp-test-connection"
+  labels:
+    helm.sh/chart: yesnoapp-0.1.0
+    app.kubernetes.io/name: yesnoapp
+    app.kubernetes.io/instance: yesnoapp
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['yesnoapp:6060']
+  restartPolicy: Never

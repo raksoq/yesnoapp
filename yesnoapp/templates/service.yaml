@@ -1,15 +1,16 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "yesnoapp.fullname" . }}
+  name: {{ include "yesnoapp.fullname" . }}-web
   labels:
     {{- include "yesnoapp.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
+  type: {{ .Values.yesnoapp.service.type }}
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
+    - port: {{ .Values.yesnoapp.service.port }}
+      targetPort: {{ .Values.yesnoapp.service.targetPort }}
       protocol: TCP
       name: http
   selector:
-    {{- include "yesnoapp.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "yesnoapp.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}

@@ -1,76 +1,49 @@
-# Default values for yesnoapp.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
+# Configuration values for yesnoapp Flask application
 
 replicaCount: 1
 
-image:
-  repository: nginx
-  pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+yesnoapp:
+  image:
+    repository: oskarq/yesnoapp
+    tag: redis
+    pullPolicy: IfNotPresent
+  service:
+    type: LoadBalancer
+    port: 6060
+    targetPort: 5000
+  ingress:
+    enabled: true
+    annotations: {}
+    hosts:
+      - host: # yesnoapp.local
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+    tls: []
+  environment:
+    FLASK_ENV: development
 
-imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
+# Redis configuration using the bitnami/redis chart
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false
 
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # Automatically mount a ServiceAccount's API credentials?
-  automount: true
-  # Annotations to add to the service account
-  annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name: ""
-
+# Pod configuration
 podAnnotations: {}
-podLabels: {}
-
-podSecurityContext: {}
+securityContext: {}
+  # Example: Uncomment and adjust if needed
+  # runAsUser: 1000
   # fsGroup: 2000
 
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
+# Service configuration for yesnoapp (if needed, otherwise it's handled under yesnoapp.service)
+# Removing the nginx related configurations and the global service definition
 
-service:
-  type: ClusterIP
-  port: 80
-
-ingress:
-  enabled: false
-  className: ""
-  annotations: {}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
-  hosts:
-    - host: chart-example.local
-      paths:
-        - path: /
-          pathType: ImplementationSpecific
-  tls: []
-  #  - secretName: chart-example-tls
-  #    hosts:
-  #      - chart-example.local
-
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
-
+# Liveness and Readiness Probes for the yesnoapp Flask application
 livenessProbe:
   httpGet:
     path: /
@@ -80,6 +53,17 @@ readinessProbe:
     path: /
     port: http
 
+# Resources: Define limits and requests for CPU and memory for the yesnoapp container
+resources: {}
+  # Example: Uncomment and adjust if needed
+  # limits:
+  #   cpu: "1"
+  #   memory: 512Mi
+  # requests:
+  #   cpu: "0.5"
+  #   memory: 256Mi
+
+# Autoscaling for the yesnoapp Flask application (if applicable)
 autoscaling:
   enabled: false
   minReplicas: 1
@@ -87,21 +71,16 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
 
-# Additional volumes on the output Deployment definition.
-volumes: []
-# - name: foo
-#   secret:
-#     secretName: mysecret
-#     optional: false
+# Additional configurations
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
 
-# Additional volumeMounts on the output Deployment definition.
-volumeMounts: []
-# - name: foo
-#   mountPath: "/etc/foo"
-#   readOnly: true
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
 
 nodeSelector: {}
-
 tolerations: []
-
 affinity: {}
