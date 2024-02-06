@@ -15,18 +15,15 @@ yesnoapp:
 
   ingress:
     enabled: true
-    className: nginx  # Specify the Ingress class; might need to adjust based on your cluster setup
     annotations: {}
-    # No 'hosts' specified for catch-all behavior
-    defaultBackend:
-      service:
-        name: "yesnoapp-service"  # This should match the name of your Kubernetes Service
-        port:
-          number: 80  # Ingress will route external port 80 traffic to this service port
-
+    hosts:
+      - host:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+    tls: []
   environment:
     FLASK_ENV: development
-
 
 # Redis configuration using the bitnami/redis chart
 redis:
