@@ -5,33 +5,41 @@ replicaCount: 1
 yesnoapp:
   image:
     repository: oskarq/yesnoapp
-    tag: redis-helmx
+    tag: redis-helm-cs
     pullPolicy: Always
+
   service:
     type: LoadBalancer
-    port: 6060
-    targetPort: 5000
+    port: 6060  # The external port for the LoadBalancer
+    targetPort: 5000  # The internal port on which your app listens
+
   ingress:
     enabled: true
+    className: nginx  # Specify the Ingress class; might need to adjust based on your cluster setup
     annotations: {}
-    hosts:
-      - host: # yesnoapp.local
-        paths:
-          - path: /
-            pathType: ImplementationSpecific
-    tls: []
+    # No 'hosts' specified for catch-all behavior
+    defaultBackend:
+      service:
+        name: "yesnoapp-service"  # This should match the name of your Kubernetes Service
+        port:
+          number: 80  # Ingress will route external port 80 traffic to this service port
+
   environment:
     FLASK_ENV: development
+
 
 # Redis configuration using the bitnami/redis chart
 redis:
   enabled: true
   architecture: standalone
   auth:
-    enabled: false
+    enabled: true
+    existingSecret: yesnoapp.redis-secret
+    existingSecretPasswordKey: redis-password
   master:
     persistence:
       enabled: false
+
 
 # Pod configuration
 podAnnotations: {}
@@ -89,3 +97,6 @@ affinity: {}
 configMap:
   ENV: "production"
 
+# temporary password for redis
+redisAuth:
+  password: "redis-passw0rd"  

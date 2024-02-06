@@ -5,17 +5,15 @@ metadata:
   name: {{ include "yesnoapp.fullname" . }}
   labels:
     {{- include "yesnoapp.labels" . | nindent 4 }}
-  {{- with .Values.yesnoapp.ingress.annotations }}
   annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- toYaml .Values.yesnoapp.ingress.annotations | nindent 4 }}
 spec:
   {{- if .Values.yesnoapp.ingress.className }}
   ingressClassName: {{ .Values.yesnoapp.ingress.className }}
   {{- end }}
   defaultBackend:
     service:
-      name: {{ include "yesnoapp.fullname" . }}-web
+      name: {{ .Values.yesnoapp.ingress.defaultBackend.service.name }}
       port:
-        number: {{ .Values.yesnoapp.service.port }}
+        number: {{ .Values.yesnoapp.ingress.defaultBackend.service.port.number }}
 {{- end }}

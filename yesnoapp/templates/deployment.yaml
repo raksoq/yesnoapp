@@ -22,5 +22,12 @@ spec:
             - name: http
               containerPort: {{ .Values.yesnoapp.service.targetPort }}
           envFrom:
-          - configMapRef:
-              name: {{ include "yesnoapp.fullname" . }}-envs
+            - configMapRef:
+                name: {{ include "yesnoapp.fullname" . }}-envs
+          # Here you can also include environment variables from secrets or other ConfigMaps individually
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.redis.auth.existingSecret }}
+                  key: {{ .Values.redis.auth.existingSecretPasswordKey }}

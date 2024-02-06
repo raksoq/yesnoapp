@@ -2,6 +2,8 @@ apiVersion: v2
 name: yesnoapp
 description: A Helm chart for Yes-No Flask App
 version: 0.1.0
+icon: file://icons/icon.png
+
 
 dependencies:
   - name: redis

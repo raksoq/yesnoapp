@@ -5,7 +5,7 @@ docker buildx inspect multiarch-builder --bootstrap
 
 docker buildx ls
 
-docker buildx build --platform linux/amd64,linux/arm64 -t oskarq/yesnoapp:redis-helm --push .
+docker buildx build --platform linux/amd64,linux/arm64 -t oskarq/yesnoapp:redis-helms --push .
 ```
 
 ## helm install
@@ -13,3 +13,10 @@ docker buildx build --platform linux/amd64,linux/arm64 -t oskarq/yesnoapp:redis-
 helm install yesnoapp ./yesnoapp
 helm upgrade yesnoapp ./yesnoapp
 ```
+
+## redis secret creation
+`kubectl create secret generic redis-secret --from-literal=redis-password='redis-passw0rd'`
+
+## lint
+`helm lint ./yesnoapp`
+
