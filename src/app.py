@@ -3,7 +3,9 @@ import redis
 import time
 import os
 
-app = Flask(__name__)
+app = Flask(__name__,
+            static_folder='/app/res/static',
+            template_folder='/app/res/templates')
 
 # Function to construct the Redis URL from environment variables
 def get_redis_url():
@@ -73,4 +75,6 @@ def reset():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    debug_mode = os.getenv('FLASK_DEBUG', 'False') == 'True'
+    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
+

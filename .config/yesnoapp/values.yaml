@@ -5,7 +5,7 @@ replicaCount: 1
 yesnoapp:
   image:
     repository: oskarq/yesnoapp
-    tag: redis-helm-cs
+    tag: redis-helm-structo
     pullPolicy: Always
 
   service:

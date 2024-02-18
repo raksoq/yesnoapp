@@ -4,8 +4,13 @@ FROM python:3.9-slim
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+# Adjust paths to copy the application source code and requirements.txt into the container
+# Assuming Dockerfile is in .build and your code in src at the project root
+COPY ../src/ ./
+COPY ../src/requirements.txt ./
+
+# Copy res directory if required, adjust the path accordingly
+COPY ../res/ ./res
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
